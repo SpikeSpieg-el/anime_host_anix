@@ -1,23 +1,70 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname, useSearchParams } from "next/navigation"
 import { Zap } from "lucide-react"
 
 export function GlobalLoading() {
   const [isLoading, setIsLoading] = useState(false)
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    setIsLoading(false)
+  }, [pathname, searchParams])
 
   useEffect(() => {
     // Показываем загрузчик при начале навигации
     const startLoading = () => setIsLoading(true)
     const stopLoading = () => setIsLoading(false)
 
-    // Слушаем события начала и окончания загрузки страницы
-    window.addEventListener('beforeunload', startLoading)
-    window.addEventListener('load', stopLoading)
+    const onDocumentClick = (event: MouseEvent) => {
+      if (event.defaultPrevented) return
+      if (event.button !== 0) return
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+
+      const target = event.target as HTMLElement | null
+      const anchor = target?.closest?.("a") as HTMLAnchorElement | null
+      if (!anchor) return
+
+      if (anchor.target && anchor.target !== "_self") return
+      if (anchor.hasAttribute("download")) return
+
+      const href = anchor.getAttribute("href")
+      if (!href) return
+      if (href.startsWith("#")) return
+      if (href.startsWith("mailto:") || href.startsWith("tel:")) return
+
+      // Внутренние ссылки (SPA)
+      if (href.startsWith("/")) {
+        startLoading()
+        return
+      }
+
+      // Абсолютные URL на текущий origin
+      try {
+        const url = new URL(href, window.location.href)
+        if (url.origin !== window.location.origin) return
+        if (url.hash && url.pathname === window.location.pathname && url.search === window.location.search) return
+        startLoading()
+      } catch {
+        // ignore
+      }
+    }
+
+    // Слушаем события начала и окончания загрузки страницы (fallback)
+    window.addEventListener("beforeunload", startLoading)
+    window.addEventListener("load", stopLoading)
+
+    // SPA-навигация
+    document.addEventListener("click", onDocumentClick, true)
+    window.addEventListener("popstate", startLoading)
 
     return () => {
-      window.removeEventListener('beforeunload', startLoading)
-      window.removeEventListener('load', stopLoading)
+      window.removeEventListener("beforeunload", startLoading)
+      window.removeEventListener("load", stopLoading)
+      document.removeEventListener("click", onDocumentClick, true)
+      window.removeEventListener("popstate", startLoading)
     }
   }, [])
 

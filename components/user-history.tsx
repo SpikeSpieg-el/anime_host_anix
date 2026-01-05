@@ -5,6 +5,24 @@ import Link from "next/link"
 import Image from "next/image"
 import { Clock, Search, History } from "lucide-react"
 
+function normalizePosterUrl(value: string): string {
+  const raw = (value ?? "").trim()
+  if (!raw) return raw
+
+  if (raw.startsWith("https//")) return `https://${raw.slice("https//".length)}`
+  if (raw.startsWith("http//")) return `http://${raw.slice("http//".length)}`
+
+  // Частый кейс: префикснули origin поверх уже абсолютной ссылки
+  if (raw.startsWith("https://shikimori.onehttps//")) {
+    return `https://${raw.slice("https://shikimori.onehttps//".length)}`
+  }
+  if (raw.startsWith("https://shikimori.onehttp//")) {
+    return `http://${raw.slice("https://shikimori.onehttp//".length)}`
+  }
+
+  return raw
+}
+
 export function UserHistory() {
   const [history, setHistory] = useState<any[]>([])
   const [lastSearches, setLastSearches] = useState<string[]>([])
@@ -15,7 +33,12 @@ export function UserHistory() {
     // 1. Загружаем историю просмотров
     try {
       const storedHistory = JSON.parse(localStorage.getItem("watch-history") || "[]")
-      setHistory(storedHistory.slice(0, 6)) // Берем последние 6
+      const normalized = Array.isArray(storedHistory)
+        ? storedHistory
+            .slice(0, 6)
+            .map((item: any) => ({ ...item, poster: normalizePosterUrl(item?.poster) }))
+        : []
+      setHistory(normalized) // Берем последние 6
     } catch (e) { console.error(e) }
 
     // 2. Загружаем историю поиска

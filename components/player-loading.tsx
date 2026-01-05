@@ -2,7 +2,7 @@ import { Zap } from "lucide-react"
 
 export function PlayerLoading() {
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl flex items-center justify-center">
+    <div className="absolute inset-0 overflow-hidden rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         {/* Анимированный логотип */}
         <a className="flex items-center gap-3 z-50 group" href="/">

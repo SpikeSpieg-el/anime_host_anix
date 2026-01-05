@@ -3,6 +3,20 @@
 const BASE_URL = "https://shikimori.one/api";
 const SITE_URL = "https://shikimori.one";
 
+function normalizeShikimoriUrl(value: string): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return raw;
+
+  if (raw.startsWith("https//")) return `https://${raw.slice("https//".length)}`;
+  if (raw.startsWith("http//")) return `http://${raw.slice("http//".length)}`;
+
+  if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+  if (raw.startsWith("/")) return `${SITE_URL}${raw}`;
+
+  return `${SITE_URL}/${raw}`;
+}
+
 export interface ShikimoriAnime {
   id: number;
   name: string;
@@ -19,6 +33,41 @@ export interface ShikimoriAnime {
   kind: string;
   description?: string;
   genres?: { name: string; russian: string }[];
+}
+
+export interface ShikimoriFranchiseNode {
+  id: number;
+  date?: number;
+  name: string;
+  image_url: string;
+  url: string;
+  year: number | null;
+  kind: string;
+  weight: number;
+}
+
+export interface ShikimoriFranchise {
+  links: {
+    id: number;
+    source_id: number;
+    target_id: number;
+    source: number;
+    target: number;
+    weight: number;
+    relation: string;
+  }[];
+  nodes: ShikimoriFranchiseNode[];
+  current_id: number;
+}
+
+export interface FranchiseItem {
+  id: string;
+  title: string;
+  poster: string;
+  year?: number;
+  kind?: string;
+  weight: number;
+  isCurrent: boolean;
 }
 
 export interface Anime {
@@ -78,7 +127,7 @@ export const GENRES_MAP: Record<string, string> = {
 
 // Помощник: Трансформация данных
 async function transformAnime(item: ShikimoriAnime): Promise<Anime> {
-  let posterUrl = SITE_URL + item.image.original;
+  let posterUrl = normalizeShikimoriUrl(item.image.original);
 
   if (posterUrl.includes("missing_original") || posterUrl.includes("missing_preview")) {
     posterUrl = `https://placehold.co/400x600/18181b/orange/png?text=${encodeURIComponent(item.russian || item.name)}`;
@@ -124,6 +173,49 @@ export async function getAnimeById(id: string) {
     return await transformAnime(data);
   } catch (error) {
     return null;
+  }
+}
+
+export async function getAnimeFranchise(id: string): Promise<FranchiseItem[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/animes/${id}/franchise`, {
+      next: { revalidate: 3600 },
+      headers: {
+        'User-Agent': 'move'
+      }
+    });
+
+    if (!res.ok) return [];
+
+    const data: ShikimoriFranchise = await res.json();
+
+    const nodes = data.nodes.filter((node) => node.url?.startsWith('/animes/'));
+
+    const items: FranchiseItem[] = nodes.map((node) => {
+      let posterUrl = normalizeShikimoriUrl(node.image_url);
+
+      if (posterUrl.includes("missing")) {
+        posterUrl = `https://placehold.co/200x300/18181b/orange/png?text=${encodeURIComponent(node.name)}`;
+      }
+
+      return {
+        id: String(node.id),
+        title: node.name,
+        poster: posterUrl,
+        year: node.year ?? undefined,
+        kind: node.kind,
+        weight: node.weight,
+        isCurrent: node.id === data.current_id
+      };
+    });
+
+    return items.sort((a, b) => {
+      if (a.weight !== b.weight) return a.weight - b.weight;
+      if ((a.year ?? 0) !== (b.year ?? 0)) return (a.year ?? 0) - (b.year ?? 0);
+      return a.title.localeCompare(b.title);
+    });
+  } catch (error) {
+    return [];
   }
 }
 
