@@ -21,7 +21,7 @@ export default async function WatchPage({
   if (!anime) return notFound()
 
   const franchise = await getAnimeFranchise(id)
-  const watchOrder = [...franchise].reverse()
+  const watchOrder = franchise;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">

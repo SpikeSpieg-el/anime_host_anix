@@ -76,6 +76,7 @@ export interface Anime {
   title: string;
   originalTitle: string;
   poster: string;
+  backdrop?: string;
   rating: number;
   year: number;
   episodesCurrent: number;
@@ -84,6 +85,11 @@ export interface Anime {
   description: string;
   genres: string[];
   quality: string;
+}
+
+interface ShikimoriScreenshot {
+  original: string;
+  preview: string;
 }
 
 export interface CatalogFilters {
@@ -150,6 +156,28 @@ async function transformAnime(item: ShikimoriAnime): Promise<Anime> {
   };
 }
 
+async function getAnimeBackdrop(shikimoriId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${BASE_URL}/animes/${shikimoriId}/screenshots`, {
+      next: { revalidate: 86400 },
+    });
+
+    if (!res.ok) return null;
+    const data: ShikimoriScreenshot[] = await res.json();
+
+    const first = data?.[0]?.original;
+    if (!first) return null;
+
+    const url = normalizeShikimoriUrl(first);
+    if (!url) return null;
+    if (url.includes("missing")) return null;
+
+    return url;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAnimeList(limit = 20, order = 'popularity') {
   try {
     const res = await fetch(
@@ -188,7 +216,6 @@ export async function getAnimeFranchise(id: string): Promise<FranchiseItem[]> {
     if (!res.ok) return [];
 
     const data: ShikimoriFranchise = await res.json();
-
     const nodes = data.nodes.filter((node) => node.url?.startsWith('/animes/'));
 
     const items: FranchiseItem[] = nodes.map((node) => {
@@ -209,12 +236,20 @@ export async function getAnimeFranchise(id: string): Promise<FranchiseItem[]> {
       };
     });
 
+    // ИСПРАВЛЕННАЯ СОРТИРОВКА:
     return items.sort((a, b) => {
-      if (a.weight !== b.weight) return a.weight - b.weight;
-      if ((a.year ?? 0) !== (b.year ?? 0)) return (a.year ?? 0) - (b.year ?? 0);
-      return a.title.localeCompare(b.title);
+      // 1. Сначала сортируем по году (от старых к новым)
+      if ((a.year ?? 0) !== (b.year ?? 0)) {
+        return (a.year ?? 0) - (b.year ?? 0);
+      }
+      // 2. Если год одинаковый, используем вес (основные сериалы обычно имеют меньший вес)
+      if (a.weight !== b.weight) {
+        return a.weight - b.weight;
+      }
+      return 0;
     });
   } catch (error) {
+    console.error(error);
     return [];
   }
 }
@@ -274,7 +309,9 @@ export async function getHeroRecommendation(watchedIds: string[], popularAnime?:
     // Если истории нет, берем случайное из популярных
     if (!watchedIds || watchedIds.length === 0) {
       const list = popularAnime && popularAnime.length > 0 ? popularAnime : await getAnimeList(10, 'popularity');
-      return list[Math.floor(Math.random() * list.length)];
+      const selected = list[Math.floor(Math.random() * list.length)];
+      const backdrop = await getAnimeBackdrop(selected.shikimoriId);
+      return backdrop ? { ...selected, backdrop } : selected;
     }
 
     // 1. Берем последнее просмотренное
@@ -282,8 +319,10 @@ export async function getHeroRecommendation(watchedIds: string[], popularAnime?:
     const response = await fetch(`${BASE_URL}/animes/${lastWatchedId}`);
 
     if (!response.ok) {
-       const list = popularAnime && popularAnime.length > 0 ? popularAnime : await getAnimeList(10, 'popularity');
-       return list[0];
+      if (!popularAnime || popularAnime.length === 0) return null;
+      const selected = popularAnime[0];
+      const backdrop = await getAnimeBackdrop(selected.shikimoriId);
+      return backdrop ? { ...selected, backdrop } : selected;
     }
 
     const lastAnime = await response.json();
@@ -295,20 +334,33 @@ export async function getHeroRecommendation(watchedIds: string[], popularAnime?:
     );
 
     if (!recommendedRes.ok) {
-        return popularAnime ? popularAnime[0] : null;
+      if (!popularAnime || popularAnime.length === 0) return null;
+      const selected = popularAnime[0];
+      const backdrop = await getAnimeBackdrop(selected.shikimoriId);
+      return backdrop ? { ...selected, backdrop } : selected;
     }
 
     const recommended = await recommendedRes.json();
 
     if (recommended.length > 0) {
       const selected = recommended[Math.floor(Math.random() * Math.min(5, recommended.length))];
-      return await getAnimeById(String(selected.id));
+      const anime = await getAnimeById(String(selected.id));
+      if (!anime) return null;
+
+      const backdrop = await getAnimeBackdrop(anime.shikimoriId);
+      return backdrop ? { ...anime, backdrop } : anime;
     }
 
-    return popularAnime ? popularAnime[0] : null;
+    if (!popularAnime || popularAnime.length === 0) return null;
+    const selected = popularAnime[0];
+    const backdrop = await getAnimeBackdrop(selected.shikimoriId);
+    return backdrop ? { ...selected, backdrop } : selected;
   } catch (error) {
     console.error("Recommendation error:", error);
-    return popularAnime ? popularAnime[0] : null;
+    if (!popularAnime || popularAnime.length === 0) return null;
+    const selected = popularAnime[0];
+    const backdrop = await getAnimeBackdrop(selected.shikimoriId);
+    return backdrop ? { ...selected, backdrop } : selected;
   }
 }
 

@@ -7,14 +7,14 @@ interface EpisodeSelectorProps {
   totalEpisodes: number
   currentEpisode?: number
   onSelectEpisode: (episode: number) => void
-  onStartWatching: () => void
+  onStartWatching?: () => void
 }
 
 export function EpisodeSelector({ 
   totalEpisodes, 
   currentEpisode, 
   onSelectEpisode, 
-  onStartWatching 
+  onStartWatching = () => {} 
 }: EpisodeSelectorProps) {
   const [selectedEpisode, setSelectedEpisode] = useState<number>(currentEpisode || 1)
 

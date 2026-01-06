@@ -14,16 +14,28 @@ import {
 export function HeroBanner({ anime }: { anime: any }) {
   if (!anime) return null
 
+  const desktopBackdrop = anime.backdrop || anime.poster
+
   return (
     <div className="relative w-full h-[550px] md:h-[700px] mb-12 overflow-hidden">
       {/* Фоновое изображение */}
       <div className="absolute inset-0">
+        {/* Mobile image */}
         <Image
           src={anime.poster}
           alt={anime.title}
           fill
           priority
-          className="object-cover object-top opacity-60 md:opacity-100"
+          className="object-cover object-top opacity-60 md:hidden"
+        />
+
+        {/* Desktop image (prefer horizontal backdrop if available) */}
+        <Image
+          src={desktopBackdrop}
+          alt={anime.title}
+          fill
+          priority
+          className="hidden md:block object-cover object-top opacity-100"
         />
         {/* Градиентный переход в черный */}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />

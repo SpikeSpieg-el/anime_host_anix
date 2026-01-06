@@ -1,79 +1,69 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { PlayerLoading } from "@/components/player-loading"
-import Cookies from 'js-cookie'
-import { recordWatchStart } from "@/components/history-tracker"
 
 interface KodikPlayerProps {
   shikimoriId: string
   title: string
   poster: string
-  episode?: number
+  episode: number
 }
 
 export function KodikPlayer({ shikimoriId, title, poster, episode }: KodikPlayerProps) {
   const [isLoading, setIsLoading] = useState(true)
-  const [started, setStarted] = useState(false)
+  const [isStarted, setIsStarted] = useState(false)
 
-  // Ссылка формируется автоматически. 
-  // Мы ищем по shikimoriID. Если его нет, можно искать по title.
-  // Параметры:
-  // &translations=false - скрыть лишние переводы (оставить топ)
-  // &only_anime=true - искать только аниме
-  // &no_ads=true - отключить рекламу
-  const src = `//kodik.cc/find-player?shikimoriID=${shikimoriId}&title=${encodeURIComponent(title)}&types=anime,anime-serial&block_blocked_countries=true&no_ads=true`
+  const playerSrc = useMemo(() => {
+    const params = new URLSearchParams({
+      shikimoriID: shikimoriId,
+      episode: String(episode), // Синхронизирует плеер с вашей кнопкой
+      types: 'anime,anime-serial',
+      // hide_selectors: 'true', // УДАЛЕНО: теперь озвучки и серии видны внутри
+      // only_episode: 'true',   // УДАЛЕНО: чтобы плеер видел весь список серий и сезонов
+      no_ads: 'true',
+      block_blocked_countries: 'true',
+    })
+    // Используем протокол https принудительно
+    return `https://kodik.cc/find-player?${params.toString()}`
+  }, [shikimoriId, episode])
 
   useEffect(() => {
-    if (!started) return
-
+    // При смене серии показываем лоадер, пока iframe не загрузит новый контент
     setIsLoading(true)
-
-    // Сохраняем ID аниме в историю просмотра (для рекомендаций/баннеров)
-    const currentHistory = JSON.parse(Cookies.get('watched_history') || '[]')
-    const newHistory = [shikimoriId, ...currentHistory.filter((id: string) => id !== shikimoriId)].slice(0, 10)
-    Cookies.set('watched_history', JSON.stringify(newHistory), { expires: 365 })
-
-    // Сохраняем историю продолжения просмотра (локально)
-    recordWatchStart(
-      { id: shikimoriId, title, poster },
-      { episode }
-    )
-
-    // Имитируем минимальное время загрузки для UX
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [episode, poster, shikimoriId, started, title])
-
-  const handleIframeLoad = () => {
-    setIsLoading(false)
-  }
+  }, [episode])
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-950 border border-zinc-800 shadow-2xl">
-      {!started ? (
-        <button
-          type="button"
-          onClick={() => setStarted(true)}
-          className="absolute inset-0 flex items-center justify-center bg-zinc-950/30 backdrop-blur-sm text-white font-semibold hover:bg-zinc-950/40 transition"
-        >
-          Смотреть
-        </button>
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-zinc-950 border border-white/5 shadow-2xl">
+      {!isStarted ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <img 
+            src={poster} 
+            className="absolute inset-0 w-full h-full object-cover opacity-20 blur-xl" 
+            alt="" 
+          />
+          <button
+            onClick={() => setIsStarted(true)}
+            className="group relative z-10 flex items-center gap-3 px-8 py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(234,88,12,0.4)]"
+          >
+            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+               <path d="M8 5v14l11-7z" />
+            </svg>
+            Смотреть {episode} серию
+          </button>
+        </div>
       ) : (
         <>
           {isLoading && <PlayerLoading />}
           <iframe
-            src={src}
-            className={`h-full w-full transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-            width="100%"
-            height="100%"
+            src={playerSrc}
+            className={`h-full w-full transition-opacity duration-700 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
             allowFullScreen
             allow="autoplay; fullscreen"
-            title={title}
-            onLoad={handleIframeLoad}
+            onLoad={() => setIsLoading(false)}
+            // allow-popups НУЖЕН для того, чтобы кнопки выбора озвучки внутри плеера работали корректно
+            // но это может пропускать рекламу. Это компромисс для работы интерфейса Kodik.
+            sandbox="allow-forms allow-scripts allow-same-origin allow-presentation allow-popups"
           />
         </>
       )}
