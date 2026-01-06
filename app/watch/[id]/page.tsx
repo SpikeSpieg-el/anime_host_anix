@@ -29,10 +29,7 @@ export default async function WatchPage({
 
       <div className="container mx-auto px-4 py-8">
         <WatchPageClient
-          shikimoriId={anime.shikimoriId}
-          title={anime.title}
-          poster={anime.poster}
-          totalEpisodes={anime.episodesTotal || 1}
+          anime={anime}
           initialEpisode={Number.isFinite(episode) && (episode as number) > 0 ? (episode as number) : undefined}
         />
 

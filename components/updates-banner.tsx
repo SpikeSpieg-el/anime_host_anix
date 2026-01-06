@@ -11,6 +11,7 @@ interface AnimeShort {
   poster: string
   episodesCurrent?: number
   year?: number
+  airedOn?: string
   status?: string
 }
 
@@ -128,7 +129,11 @@ export function UpdatesBanner({ updates, announcements }: UpdatesBannerProps) {
                            Анонс
                         </span>
                         <span className="text-zinc-600">•</span>
-                        <span className="text-zinc-400">{anime.year || "Скоро"}</span>
+                        <span className="text-zinc-400">
+                          {anime.airedOn && !Number.isNaN(new Date(anime.airedOn).getTime())
+                            ? new Date(anime.airedOn).toLocaleDateString("ru-RU")
+                            : anime.year || "Скоро"}
+                        </span>
                     </div>
                   </div>
                   

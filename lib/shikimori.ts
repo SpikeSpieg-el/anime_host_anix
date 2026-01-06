@@ -79,6 +79,7 @@ export interface Anime {
   backdrop?: string;
   rating: number;
   year: number;
+  airedOn?: string;
   episodesCurrent: number;
   episodesTotal: number;
   status: string;
@@ -147,6 +148,7 @@ async function transformAnime(item: ShikimoriAnime): Promise<Anime> {
     poster: posterUrl,
     rating: parseFloat(item.score) || 0,
     year: item.aired_on ? new Date(item.aired_on).getFullYear() : 2025,
+    airedOn: item.aired_on || undefined,
     episodesCurrent: item.episodes_aired,
     episodesTotal: item.episodes || 0,
     status: item.status === 'ongoing' ? 'Ongoing' : 'Completed',

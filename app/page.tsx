@@ -4,6 +4,7 @@ import { getAnimeList, getRecentUpdates, getAnnouncements, getHeroRecommendation
 import { HeroBanner } from "@/components/hero-banner"
 import { UserHistory } from "@/components/user-history"
 import { UpdatesBanner } from "@/components/updates-banner" // Импортируем баннер
+import { BookmarksSection } from "@/components/bookmarks-section"
 import { cookies } from 'next/headers' // Импортируем для работы с куками
 
 export default async function HomePage() {
@@ -46,6 +47,8 @@ export default async function HomePage() {
         {/* 2. ИСТОРИЯ И ПОИСК (Клиентский блок) */}
         {/* Поднимаем его визуально, чтобы он был "поверх" баннера или сразу под ним */}
         <UserHistory />
+
+        <BookmarksSection />
 
         {/* 2. НОВЫЙ БАННЕР ОБНОВЛЕНИЙ */}
         <div className="mb-12">

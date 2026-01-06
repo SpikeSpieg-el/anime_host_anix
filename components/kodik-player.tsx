@@ -8,9 +8,10 @@ interface KodikPlayerProps {
   title: string
   poster: string
   episode: number
+  onStart?: () => void
 }
 
-export function KodikPlayer({ shikimoriId, title, poster, episode }: KodikPlayerProps) {
+export function KodikPlayer({ shikimoriId, title, poster, episode, onStart }: KodikPlayerProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isStarted, setIsStarted] = useState(false)
 
@@ -43,7 +44,10 @@ export function KodikPlayer({ shikimoriId, title, poster, episode }: KodikPlayer
             alt="" 
           />
           <button
-            onClick={() => setIsStarted(true)}
+            onClick={() => {
+              onStart?.()
+              setIsStarted(true)
+            }}
             className="group relative z-10 flex items-center gap-3 px-8 py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_30px_rgba(234,88,12,0.4)]"
           >
             <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">

@@ -24,6 +24,12 @@ export function GlobalLoading() {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
 
       const target = event.target as HTMLElement | null
+
+      // Если клик пришел из интерактивного контрола (кнопка/инпут и т.п.),
+      // не включаем глобальную загрузку: такие клики часто не означают навигацию
+      // (например, кнопка "Сохранить" внутри карточки-ссылки).
+      if (target?.closest?.("button, [role='button'], input, select, textarea")) return
+
       const anchor = target?.closest?.("a") as HTMLAnchorElement | null
       if (!anchor) return
 

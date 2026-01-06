@@ -53,7 +53,7 @@ export function RecentlyViewed() {
                 {anime.title}
               </h3>
               <p className="text-xs text-zinc-500 mt-1">
-                {anime.year} • {anime.episodes.length} ep
+                {anime.year} • {Math.max(0, ...Object.values(anime.players).map((episodes) => episodes.length))} ep
               </p>
               <span className="mt-2 inline-flex items-center gap-1 text-xs text-orange-500">
                 <Play className="h-3 w-3 fill-orange-500" />

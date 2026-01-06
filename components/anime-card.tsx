@@ -2,11 +2,16 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Play, Star } from "lucide-react"
+import { Bookmark, Star } from "lucide-react"
 import { Anime } from "@/lib/shikimori"
+import { Button } from "@/components/ui/button"
+import { useBookmarks } from "@/components/bookmarks-provider"
 
 // Принимаем данные, которые вернул transformAnime
 export function AnimeCard({ anime }: { anime: Anime }) {
+  const { isSaved, toggle } = useBookmarks()
+  const saved = isSaved(anime.id)
+
   return (
     <Link href={`/watch/${anime.id}`} className="group relative block">
       <div className="relative aspect-[2/3] overflow-hidden rounded-lg bg-zinc-900">
@@ -28,6 +33,23 @@ export function AnimeCard({ anime }: { anime: Anime }) {
           }`}>
             {anime.quality || 'TV'}
           </span>
+        </div>
+
+        <div className="absolute top-2 left-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="icon-sm"
+            className="bg-black/60 hover:bg-black/70 text-white border border-white/10"
+            aria-label={saved ? "Убрать из закладок" : "Сохранить на потом"}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              toggle(anime)
+            }}
+          >
+            <Bookmark className={saved ? "fill-orange-500 text-orange-500" : "text-white"} />
+          </Button>
         </div>
 
         {/* Рейтинг (внизу) */}
