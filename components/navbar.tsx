@@ -7,6 +7,25 @@ import { Menu, X, ChevronDown, Flame, Tv, Zap } from "lucide-react"
 import { GENRES_MAP } from "@/lib/shikimori"
 import { SearchSuggestions } from "@/components/search-suggestions"
 
+function saveSearchHistory(query: string) {
+  if (typeof window === "undefined") return
+
+  const normalized = query.trim()
+  if (!normalized) return
+
+  try {
+    const raw = localStorage.getItem("search-history")
+    const parsed = raw ? JSON.parse(raw) : []
+    const current: string[] = Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : []
+
+    const next = [normalized, ...current.filter((q) => q !== normalized)].slice(0, 10)
+    localStorage.setItem("search-history", JSON.stringify(next))
+    window.dispatchEvent(new Event("search-history-updated"))
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 export function Navbar() {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
@@ -15,6 +34,7 @@ export function Navbar() {
   // Логика поиска: Редирект в каталог
   const handleSearchSelect = (query: string) => {
     if (!query.trim()) return
+    saveSearchHistory(query)
     // ВАЖНО: Перенаправляем на каталог с параметром search
     router.push(`/catalog?search=${encodeURIComponent(query)}`)
     setIsOpen(false)

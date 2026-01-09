@@ -30,22 +30,41 @@ export function UserHistory() {
 
   useEffect(() => {
     setMounted(true)
-    // 1. Загружаем историю просмотров
-    try {
-      const storedHistory = JSON.parse(localStorage.getItem("watch-history") || "[]")
-      const normalized = Array.isArray(storedHistory)
-        ? storedHistory
-            .slice(0, 6)
-            .map((item: any) => ({ ...item, poster: normalizePosterUrl(item?.poster) }))
-        : []
-      setHistory(normalized) // Берем последние 6
-    } catch (e) { console.error(e) }
 
-    // 2. Загружаем историю поиска
-    try {
-      const storedSearch = JSON.parse(localStorage.getItem("search-history") || "[]")
-      setLastSearches(storedSearch.slice(0, 5)) // Берем последние 5
-    } catch (e) { console.error(e) }
+    const load = () => {
+      // 1. Загружаем историю просмотров
+      try {
+        const storedHistory = JSON.parse(localStorage.getItem("watch-history") || "[]")
+        const normalized = Array.isArray(storedHistory)
+          ? storedHistory
+              .slice(0, 6)
+              .map((item: any) => ({ ...item, poster: normalizePosterUrl(item?.poster) }))
+          : []
+        setHistory(normalized) // Берем последние 6
+      } catch (e) {
+        console.error(e)
+      }
+
+      // 2. Загружаем историю поиска
+      try {
+        const storedSearch = JSON.parse(localStorage.getItem("search-history") || "[]")
+        const next = Array.isArray(storedSearch) ? storedSearch.filter((x) => typeof x === "string") : []
+        setLastSearches(next.slice(0, 5)) // Берем последние 5
+      } catch (e) {
+        console.error(e)
+      }
+    }
+
+    load()
+
+    const onUpdated = () => load()
+    window.addEventListener("search-history-updated", onUpdated)
+    window.addEventListener("storage", onUpdated)
+
+    return () => {
+      window.removeEventListener("search-history-updated", onUpdated)
+      window.removeEventListener("storage", onUpdated)
+    }
   }, [])
 
   if (!mounted) return null

@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Suspense } from "react" // ✅ Import Suspense
 import { GlobalLoading } from "@/components/global-loading"
 import { BookmarksProvider } from "@/components/bookmarks-provider"
 import "./globals.css"
@@ -10,9 +11,9 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "CinemaStream - Anime & Movies",
+  title: "Anix",
   description: "Your distraction-free streaming destination for anime and movies",
-  generator: "v0.app",
+  generator: "Anix_stream",
   icons: {
     icon: [
       {
@@ -44,7 +45,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans antialiased bg-black min-h-screen`}>
-        <GlobalLoading />
+        {/* ✅ Fix: Wrap GlobalLoading in Suspense because it uses searchParams */}
+        <Suspense fallback={null}>
+          <GlobalLoading />
+        </Suspense>
+        
         <BookmarksProvider>{children}</BookmarksProvider>
         <Analytics />
       </body>

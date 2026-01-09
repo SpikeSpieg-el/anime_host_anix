@@ -5,6 +5,25 @@ import { Search, Clock, X, ChevronRight } from "lucide-react"
 import { Anime, searchAnime } from "@/lib/shikimori"
 import { useRouter } from "next/navigation"
 
+function saveSearchHistory(query: string) {
+  if (typeof window === "undefined") return
+
+  const normalized = query.trim()
+  if (!normalized) return
+
+  try {
+    const raw = localStorage.getItem("search-history")
+    const parsed = raw ? JSON.parse(raw) : []
+    const current: string[] = Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : []
+
+    const next = [normalized, ...current.filter((q) => q !== normalized)].slice(0, 10)
+    localStorage.setItem("search-history", JSON.stringify(next))
+    window.dispatchEvent(new Event("search-history-updated"))
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 interface SearchSuggestionsProps {
   value: string
   onChange: (value: string) => void
@@ -24,6 +43,7 @@ export function SearchSuggestions({
   const [suggestions, setSuggestions] = useState<Anime[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+
   const inputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -57,7 +77,8 @@ export function SearchSuggestions({
   }, [value])
 
   const handleAnimeClick = (animeId: string) => {
-    router.push(`/anime/${animeId}`) // Переход на страницу конкретного аниме
+    saveSearchHistory(value)
+    router.push(`/watch/${animeId}`) // Переход на страницу конкретного аниме
     setIsOpen(false)
     onChange("") // Очищаем поиск после перехода
   }
@@ -65,6 +86,7 @@ export function SearchSuggestions({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") setIsOpen(false)
     if (e.key === "Enter" && value.trim()) {
+      saveSearchHistory(value)
       onSelect(value.trim()) // Переход в каталог
       setIsOpen(false)
     }
@@ -134,7 +156,7 @@ export function SearchSuggestions({
                 ))}
                 
                 <button 
-                    onClick={() => onSelect(value)}
+                    onClick={() => { saveSearchHistory(value); onSelect(value) }}
                     className="w-full mt-2 p-3 text-center text-sm font-medium text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
                     <Search size={14} />
@@ -147,7 +169,7 @@ export function SearchSuggestions({
                     <div className="p-6 text-center">
                         <p className="text-zinc-500 text-sm mb-2">Ничего не найдено</p>
                         <button 
-                            onClick={() => onSelect(value)}
+                            onClick={() => { saveSearchHistory(value); onSelect(value) }}
                             className="text-orange-500 text-sm hover:underline"
                         >
                             Искать в каталоге &rarr;
