@@ -157,6 +157,7 @@ export interface NewsItem {
   id: string;
   title: string;
   excerpt: string;
+  imageUrl?: string;
   date: string;
   author: string;
   comments: number;
@@ -205,8 +206,34 @@ export const GENRES_MAP: Record<string, string> = {
 // --- Helpers ---
 
 /**
- * Пытается найти постер через Anilist API, если Shikimori подвел.
- * Использует оригинальное название (Romaji/English) для поиска.
+ * Вспомогательная функция для выбора лучшего доступного постера.
+ * Если Shikimori отдает заглушку, идем на Anilist.
+ */
+async function resolveBestPoster(shikimoriUrl: string, romajiName: string, russianName: string): Promise<string> {
+  const url = normalizeShikimoriUrl(shikimoriUrl);
+  
+  // Признаки того, что обложка на Shikimori отсутствует или слишком маленькая
+  const isMissing = 
+    !url || 
+    url.includes("missing") || 
+    url.includes("stub") || 
+    url.includes("x96") || 
+    url.includes("x48");
+
+  if (isMissing) {
+    // Пробуем найти на Anilist
+    const fallback = await getAnilistPoster(romajiName);
+    if (fallback) return fallback;
+
+    // Если и там нет, генерируем красивый плейсхолдер
+    return `https://placehold.co/400x600/18181b/orange/png?text=${encodeURIComponent(russianName || romajiName)}`;
+  }
+
+  return url;
+}
+
+/**
+ * Пытается найти постер через Anilist API.
  */
 async function getAnilistPoster(searchTitle: string): Promise<string | null> {
   try {
@@ -229,39 +256,21 @@ async function getAnilistPoster(searchTitle: string): Promise<string | null> {
         `,
         variables: { search: searchTitle }
       }),
-      next: { revalidate: 86400 } // Кэшируем на сутки
+      next: { revalidate: 86400 } 
     });
 
     if (!response.ok) return null;
-    
     const json = await response.json();
     const media = json?.data?.Media;
-    
-    if (media?.coverImage?.extraLarge) return media.coverImage.extraLarge;
-    if (media?.coverImage?.large) return media.coverImage.large;
-    
-    return null;
+    return media?.coverImage?.extraLarge || media?.coverImage?.large || null;
   } catch (e) {
-    console.error("Anilist fallback failed for:", searchTitle);
     return null;
   }
 }
 
 async function transformAnime(item: ShikimoriAnime): Promise<Anime> {
-  let posterUrl = normalizeShikimoriUrl(item.image.original);
-
-  // Проверяем на "битую" картинку Shikimori
-  if (posterUrl.includes("missing_original") || posterUrl.includes("missing_preview") || posterUrl.includes("x96")) {
-    // Пытаемся найти альтернативу на Anilist по оригинальному названию (item.name обычно Romaji)
-    const fallbackUrl = await getAnilistPoster(item.name);
-    
-    if (fallbackUrl) {
-      posterUrl = fallbackUrl;
-    } else {
-      // Если и там не нашли, ставим заглушку
-      posterUrl = `https://placehold.co/400x600/18181b/orange/png?text=${encodeURIComponent(item.russian || item.name)}`;
-    }
-  }
+  // Используем новую функцию для постера
+  const posterUrl = await resolveBestPoster(item.image.original, item.name, item.russian);
 
   return {
     id: String(item.id),
@@ -285,10 +294,22 @@ function transformTopic(topic: ShikimoriTopic): NewsItem {
   const rawText = topic.body || "";
   const excerpt = rawText.length > 150 ? rawText.slice(0, 150) + "..." : rawText;
 
+  let imageUrl: string | undefined;
+  if (topic.html_body) {
+    const match = topic.html_body.match(/<img[^>]+src="([^"]+)"/);
+    if (match && match[1]) {
+      imageUrl = match[1];
+      if (!imageUrl.startsWith("http")) {
+        imageUrl = normalizeShikimoriUrl(imageUrl);
+      }
+    }
+  }
+
   return {
     id: String(topic.id),
     title: topic.topic_title,
     excerpt: excerpt,
+    imageUrl: imageUrl,
     date: new Date(topic.created_at).toLocaleDateString('ru-RU'),
     author: topic.user.nickname,
     comments: topic.comments_count,
@@ -398,17 +419,33 @@ export async function getAnimeFranchise(id: string): Promise<FranchiseItem[]> {
 
     const items: FranchiseItem[] = await Promise.all(nodes.map(async (node) => {
       let posterUrl = normalizeShikimoriUrl(node.image_url);
+      let title = node.name;
       
-      // Логика фоллбэка для франшизы
-      if (posterUrl.includes("missing") || posterUrl.includes("x96")) {
-         const fallback = await getAnilistPoster(node.name);
-         if (fallback) posterUrl = fallback;
-         else posterUrl = `https://placehold.co/200x300/18181b/orange/png?text=${encodeURIComponent(node.name)}`;
+      // Проверяем на "битую" картинку Shikimori
+      if (posterUrl.includes("missing") || posterUrl.includes("x96") || posterUrl.includes("x48")) {
+        // Получаем полную информацию об аниме, чтобы взять romaji название
+        try {
+          const animeRes = await shikimoriFetch(`${BASE_URL}/animes/${node.id}`);
+          if (animeRes.ok) {
+            const animeData: ShikimoriAnime = await animeRes.json();
+            // Используем romaji (animeData.name) для поиска в Anilist
+            const fallback = await getAnilistPoster(animeData.name);
+            if (fallback) {
+              posterUrl = fallback;
+            } else {
+              posterUrl = `https://placehold.co/400x600/18181b/orange/png?text=${encodeURIComponent(title)}`;
+            }
+          } else {
+            posterUrl = `https://placehold.co/400x600/18181b/orange/png?text=${encodeURIComponent(title)}`;
+          }
+        } catch {
+          posterUrl = `https://placehold.co/400x600/18181b/orange/png?text=${encodeURIComponent(title)}`;
+        }
       }
 
       return {
         id: String(node.id),
-        title: node.name,
+        title: title,
         poster: posterUrl,
         year: node.year ?? undefined,
         kind: node.kind,

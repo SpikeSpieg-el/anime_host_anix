@@ -15,6 +15,7 @@ import { BookmarksSection } from "@/components/bookmarks-section"
 import { AiAdvisor } from "@/components/ai-advisor"
 import { cookies } from 'next/headers'
 import Link from "next/link"
+import { ImageIcon, MessageSquare, User, ExternalLink } from "lucide-react"
 
 export default async function HomePage() {
   // 1. Получаем историю из кук
@@ -33,7 +34,7 @@ export default async function HomePage() {
     getPopularNow(12),         // Популярные онгоинги
     getPopularAlways(12),      // Популярные завершенные
     getOngoingList(12),        // Полный список онгоингов (ranked)
-    getForumNews(4),           // Новости сайта/индустрии
+    getForumNews(5),           // Новости сайта/индустрии
     getAnnouncements(3),       // Анонсы
   ]);
 
@@ -64,35 +65,57 @@ export default async function HomePage() {
         <UserHistory />
         <BookmarksSection />
 
-        {/* 3. НОВОСТИ И ОБНОВЛЕНИЯ (Аналог /forum/updates) */}
+        {/* 3. НОВОСТИ И ОБНОВЛЕНИЯ */}
         {newsUpdates.length > 0 && (
-            <section className="mb-12 bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <span className="w-2 h-8 bg-orange-500 rounded-full"></span>
-                        Новости индустрии
-                    </h2>
-                    <Link href="https://shikimori.one/forum/news" target="_blank" className="text-zinc-400 text-sm hover:text-white transition">
-                        Все новости Shikimori &rarr;
+            <section className="mb-16">
+                <div className="flex items-end justify-between mb-6">
+                    <div>
+                        <h2 className="text-3xl font-bold text-white mb-1 flex items-center gap-3">
+                            Новости индустрии
+                            <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-xs font-bold border border-blue-500/20 uppercase tracking-wider">
+                                News
+                            </span>
+                        </h2>
+                        <p className="text-zinc-500 text-sm">Главные события мира аниме</p>
+                    </div>
+                    <Link href="https://shikimori.one/forum/news" target="_blank" className="group flex items-center gap-1 text-zinc-400 text-sm font-medium hover:text-white transition">
+                        Все новости <ExternalLink className="w-3 h-3 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                     </Link>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {newsUpdates.map((news) => (
-                        <a key={news.id} href={news.url} target="_blank" rel="noopener noreferrer" className="block group">
-                            <article className="h-full flex flex-col justify-between p-4 bg-zinc-900 rounded-lg hover:bg-zinc-800 transition border border-zinc-800 hover:border-orange-500/50">
-                                <div>
-                                    <h3 className="font-semibold text-zinc-100 group-hover:text-orange-400 transition line-clamp-2 mb-2">
-                                        {news.title}
-                                    </h3>
-                                    <p className="text-xs text-zinc-500 line-clamp-3 mb-3">{news.excerpt}</p>
+                        <a 
+                           key={news.id} 
+                           href={news.url} 
+                           target="_blank" 
+                           rel="noopener noreferrer" 
+                           className="group flex flex-col h-full bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5 hover:border-zinc-600 transition-all hover:bg-zinc-900 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/50"
+                        >
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs font-medium text-zinc-500 bg-zinc-800/50 px-2 py-1 rounded-md">
+                                    {news.date}
+                                </span>
+                            </div>
+
+                            <h3 className="font-bold text-base text-zinc-100 leading-snug mb-2 group-hover:text-blue-400 transition-colors line-clamp-3">
+                                {news.title}
+                            </h3>
+                            
+                            <p className="text-sm text-zinc-400 line-clamp-3 mb-4 flex-1 leading-relaxed">
+                                {news.excerpt.replace(/\[.*?\]/g, "")}
+                            </p>
+
+                            <div className="flex items-center justify-between pt-4 border-t border-white/5 mt-auto">
+                                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                    <User className="w-3 h-3" />
+                                    <span className="truncate max-w-[100px]">{news.author}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-xs text-zinc-600 mt-auto pt-3 border-t border-zinc-800">
-                                    <span>{news.date}</span>
-                                    <span className="flex items-center gap-1">
-                                        💬 {news.comments}
-                                    </span>
+                                <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-400 bg-zinc-800/50 px-2 py-1 rounded-md group-hover:bg-zinc-800 group-hover:text-white transition-colors">
+                                    <MessageSquare className="w-3 h-3" />
+                                    <span>{news.comments}</span>
                                 </div>
-                            </article>
+                            </div>
                         </a>
                     ))}
                 </div>
