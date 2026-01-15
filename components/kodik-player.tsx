@@ -18,14 +18,13 @@ export function KodikPlayer({ shikimoriId, title, poster, episode, onStart }: Ko
   const playerSrc = useMemo(() => {
     const params = new URLSearchParams({
       shikimoriID: shikimoriId,
-      episode: String(episode), // Синхронизирует плеер с вашей кнопкой
+      episode: String(episode),
       types: 'anime,anime-serial',
-      // hide_selectors: 'true', // УДАЛЕНО: теперь озвучки и серии видны внутри
-      // only_episode: 'true',   // УДАЛЕНО: чтобы плеер видел весь список серий и сезонов
       no_ads: 'true',
       block_blocked_countries: 'true',
+      hide_selectors: 'false',
+      autoplay: '0',
     })
-    // Используем протокол https принудительно
     return `https://kodik.cc/find-player?${params.toString()}`
   }, [shikimoriId, episode])
 
@@ -64,9 +63,9 @@ export function KodikPlayer({ shikimoriId, title, poster, episode, onStart }: Ko
             className={`h-full w-full transition-opacity duration-700 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
             allowFullScreen
             allow="autoplay; fullscreen"
+            referrerPolicy="no-referrer"
+            loading="lazy"
             onLoad={() => setIsLoading(false)}
-            // allow-popups НУЖЕН для того, чтобы кнопки выбора озвучки внутри плеера работали корректно
-            // но это может пропускать рекламу. Это компромисс для работы интерфейса Kodik.
             sandbox="allow-forms allow-scripts allow-same-origin allow-presentation allow-popups"
           />
         </>

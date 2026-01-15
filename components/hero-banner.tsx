@@ -1,7 +1,7 @@
 "use client"
 import Image from "next/image"
 import Link from "next/link"
-import { Play, Info, Star, Calendar, Film, Globe, Tv } from "lucide-react"
+import { Play, Info, Star, Calendar, Film, Globe, Tv, Flame, Sparkles } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -10,8 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { useState } from "react"
 
-export function HeroBanner({ anime }: { anime: any }) {
+interface HeroBannerProps {
+  topOfWeekAnime: any
+  recommendedAnime: any
+}
+
+export function HeroBanner({ topOfWeekAnime, recommendedAnime }: HeroBannerProps) {
+  const [mode, setMode] = useState<'top' | 'recommended'>('top')
+  const anime = mode === 'top' ? topOfWeekAnime : recommendedAnime
+  
   if (!anime) return null
 
   const desktopBackdrop = anime.backdrop || anime.poster
@@ -45,8 +54,34 @@ export function HeroBanner({ anime }: { anime: any }) {
       {/* Контент */}
       <div className="relative h-full container mx-auto px-4 flex flex-col justify-end pb-20 z-10">
         <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-10 duration-700">
+          {/* Кнопки переключения */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setMode('top')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${
+                mode === 'top'
+                  ? 'bg-orange-500 text-white border border-orange-400'
+                  : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Flame size={14} />
+              Топ недели
+            </button>
+            <button
+              onClick={() => setMode('recommended')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold tracking-wider uppercase transition-all ${
+                mode === 'recommended'
+                  ? 'bg-orange-500 text-white border border-orange-400'
+                  : 'bg-white/5 text-zinc-400 border border-white/10 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Sparkles size={14} />
+              Рекомендуем
+            </button>
+          </div>
+
           <span className="inline-block px-3 py-1 mb-4 text-xs font-bold tracking-wider text-orange-400 border border-orange-500/30 bg-orange-500/10 rounded-full uppercase">
-            {anime.status === 'Ongoing' ? 'Топ недели' : 'Рекомендуем'}
+            {mode === 'top' ? 'Хит сезона' : 'Для вас'}
           </span>
 
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 leading-tight">

@@ -37,6 +37,10 @@ export function BookmarksProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    
+    // Синхронизируем ID закладок в cookies для server-side доступа
+    const bookmarkIds = items.map(a => a.id).join(',')
+    document.cookie = `bookmark_ids=${bookmarkIds}; path=/; max-age=31536000; SameSite=Lax`
   }, [items])
 
   const isSaved = useCallback(

@@ -501,14 +501,82 @@ export async function getAnimeByIds(ids: string[]) {
   }
 }
 
-export async function getHeroRecommendation(watchedIds: string[], popularAnime?: Anime[]) {
+export async function getTopOfWeek(limit = 30): Promise<Anime[]> {
   try {
+    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=ongoing&score=7`);
+    if (!res.ok) return [];
+
+    const data: ShikimoriAnime[] = await res.json();
+    const animeList = await Promise.all(data.map(transformAnime));
+
+    const animeWithBackdrop = await Promise.all(
+      animeList.map(async (anime) => {
+        const backdrop = await getAnimeBackdrop(anime.shikimoriId);
+        return backdrop ? { ...anime, backdrop } : anime;
+      })
+    );
+
+    return animeWithBackdrop;
+  } catch (error) {
+    return [];
+  }
+}
+
+async function isSameFranchise(animeId: string, watchedAnimeId: string): Promise<boolean> {
+  try {
+    const res = await shikimoriFetch(`${BASE_URL}/animes/${watchedAnimeId}/franchise`);
+    if (!res.ok) return false;
+
+    const data: ShikimoriFranchise = await res.json();
+    return data.nodes.some((node) => node.id === parseInt(animeId));
+  } catch {
+    return false;
+  }
+}
+
+async function canRecommendFranchise(animeId: string, watchedIds: string[]): Promise<boolean> {
+  try {
+    const res = await shikimoriFetch(`${BASE_URL}/animes/${animeId}/franchise`);
+    if (!res.ok) return true;
+
+    const data: ShikimoriFranchise = await res.json();
+    const currentNode = data.nodes.find((node) => node.id === parseInt(animeId));
+    
+    if (!currentNode) return true;
+
+    const earlierParts = data.nodes.filter((node) => {
+      if (node.id === parseInt(animeId)) return false;
+      return node.weight < currentNode.weight || 
+             (node.weight === currentNode.weight && node.year && currentNode.year && node.year < currentNode.year);
+    });
+
+    if (earlierParts.length > 0) {
+      const watchedSet = new Set(watchedIds.map(id => parseInt(id)));
+      const hasWatchedEarlier = earlierParts.some(part => watchedSet.has(part.id));
+      
+      if (!hasWatchedEarlier) {
+        return false;
+      }
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+export async function getHeroRecommendation(watchedIds: string[], bookmarkIds: string[] = [], popularAnime?: Anime[]) {
+  try {
+    // Объединяем watchedIds и bookmarkIds для исключения
+    const excludedIds = [...new Set([...watchedIds, ...bookmarkIds])];
+    
     // 1. Случай, если истории нет или она пустая
     if (!watchedIds || watchedIds.length === 0 || !watchedIds[0]) {
       const list = popularAnime && popularAnime.length > 0 ? popularAnime : await getPopularNow(10);
       if (!list || list.length === 0) return null;
       
-      const selected = list[Math.floor(Math.random() * list.length)];
+      const filteredList = list.filter(a => !excludedIds.includes(a.id));
+      const selected = filteredList[Math.floor(Math.random() * filteredList.length)] || list[0];
       const backdrop = await getAnimeBackdrop(selected.shikimoriId);
       return backdrop ? { ...selected, backdrop } : selected;
     }
@@ -519,7 +587,8 @@ export async function getHeroRecommendation(watchedIds: string[], popularAnime?:
 
     if (!response.ok) {
       if (!popularAnime || popularAnime.length === 0) return null;
-      const selected = popularAnime[0];
+      const filteredList = popularAnime.filter(a => !excludedIds.includes(a.id));
+      const selected = filteredList[0] || popularAnime[0];
       const backdrop = await getAnimeBackdrop(selected.shikimoriId);
       return backdrop ? { ...selected, backdrop } : selected;
     }
@@ -527,15 +596,16 @@ export async function getHeroRecommendation(watchedIds: string[], popularAnime?:
     const lastAnime = await response.json();
     const genreIds = lastAnime.genres?.map((g: any) => g.id).slice(0, 3).join(',');
 
-    // 3. Ищем похожие
+    // 3. Ищем похожие, исключая просмотренные и закладки
     const recommendedRes = await shikimoriFetch(
-      `${BASE_URL}/animes?genre=${genreIds}&order=popularity&limit=10&exclude_ids=${watchedIds.join(',')}`,
+      `${BASE_URL}/animes?genre=${genreIds}&order=popularity&limit=20&exclude_ids=${excludedIds.join(',')}`,
       undefined
     );
 
     if (!recommendedRes.ok) {
       if (!popularAnime || popularAnime.length === 0) return null;
-      const selected = popularAnime[0];
+      const filteredList = popularAnime.filter(a => !excludedIds.includes(a.id));
+      const selected = filteredList[0] || popularAnime[0];
       const backdrop = await getAnimeBackdrop(selected.shikimoriId);
       return backdrop ? { ...selected, backdrop } : selected;
     }
@@ -543,16 +613,30 @@ export async function getHeroRecommendation(watchedIds: string[], popularAnime?:
     const recommended = await recommendedRes.json();
 
     if (recommended.length > 0) {
-      const selected = recommended[Math.floor(Math.random() * Math.min(5, recommended.length))];
-      const anime = await getAnimeById(String(selected.id));
-      if (!anime) return null;
+      // Фильтруем рекомендации, исключая сиквелы без просмотра предыдущих частей
+      const validRecommendations: any[] = [];
+      
+      for (const item of recommended) {
+        const canRecommend = await canRecommendFranchise(String(item.id), watchedIds);
+        if (canRecommend) {
+          validRecommendations.push(item);
+        }
+        if (validRecommendations.length >= 5) break;
+      }
 
-      const backdrop = await getAnimeBackdrop(anime.shikimoriId);
-      return backdrop ? { ...anime, backdrop } : anime;
+      if (validRecommendations.length > 0) {
+        const selected = validRecommendations[Math.floor(Math.random() * validRecommendations.length)];
+        const anime = await getAnimeById(String(selected.id));
+        if (!anime) return null;
+
+        const backdrop = await getAnimeBackdrop(anime.shikimoriId);
+        return backdrop ? { ...anime, backdrop } : anime;
+      }
     }
 
     if (!popularAnime || popularAnime.length === 0) return null;
-    const selected = popularAnime[0];
+    const filteredList = popularAnime.filter(a => !excludedIds.includes(a.id));
+    const selected = filteredList[0] || popularAnime[0];
     const backdrop = await getAnimeBackdrop(selected.shikimoriId);
     return backdrop ? { ...selected, backdrop } : selected;
 

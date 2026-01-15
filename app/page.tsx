@@ -6,22 +6,25 @@ import {
   getOngoingList, 
   getForumNews, 
   getAnnouncements, 
-  getHeroRecommendation 
+  getHeroRecommendation,
+  getTopOfWeek
 } from "@/lib/shikimori"
 import { HeroBanner } from "@/components/hero-banner"
 import { UserHistory } from "@/components/user-history"
-import { UpdatesBanner } from "@/components/updates-banner" // Предполагаем, что этот компонент может принимать новости
 import { BookmarksSection } from "@/components/bookmarks-section"
 import { AiAdvisor } from "@/components/ai-advisor"
 import { cookies } from 'next/headers'
 import Link from "next/link"
-import { ImageIcon, MessageSquare, User, ExternalLink } from "lucide-react"
+import { MessageSquare, User, ExternalLink } from "lucide-react"
 
 export default async function HomePage() {
-  // 1. Получаем историю из кук
+  // 1. Получаем историю и закладки из кук
   const cookieStore = await cookies();
   const watchedHistory = cookieStore.get('watched_history')?.value;
   const watchedIds = watchedHistory ? JSON.parse(watchedHistory) : [];
+  
+  const bookmarkIdsCookie = cookieStore.get('bookmark_ids')?.value;
+  const bookmarkIds = bookmarkIdsCookie ? bookmarkIdsCookie.split(',').filter(Boolean) : [];
 
   // 2. Параллельный запрос данных
   const [
@@ -30,28 +33,39 @@ export default async function HomePage() {
     ongoingAnime,
     newsUpdates,
     announcements,
+    topOfWeekList,
   ] = await Promise.all([
     getPopularNow(12),         // Популярные онгоинги
     getPopularAlways(12),      // Популярные завершенные
     getOngoingList(12),        // Полный список онгоингов (ranked)
     getForumNews(5),           // Новости сайта/индустрии
     getAnnouncements(3),       // Анонсы
+    getTopOfWeek(30),          // Топ недели для hero баннера (30 для случайного выбора)
   ]);
 
   // 3. Рекомендация для Hero баннера
   const heroFallback = [...popularNow, ...popularAlways];
-  const recommendedHero = await getHeroRecommendation(watchedIds, heroFallback);
-  const heroAnime = recommendedHero || heroFallback[0];
+  const recommendedHero = await getHeroRecommendation(watchedIds, bookmarkIds, heroFallback);
+  
+  // Случайный выбор аниме для топа недели из топ-30
+  const topOfWeekHero = topOfWeekList.length > 0 
+    ? topOfWeekList[Math.floor(Math.random() * topOfWeekList.length)] 
+    : heroFallback[0];
   
   // Убираем hero из списков, чтобы не дублировать (опционально)
-  const popularNowList = popularNow.filter(a => a.id !== heroAnime?.id).slice(0, 12);
+  const popularNowList = popularNow.filter(a => a.id !== topOfWeekHero?.id && a.id !== recommendedHero?.id).slice(0, 12);
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white pb-20 overflow-x-hidden selection:bg-orange-500/30">
       <Navbar />
 
       {/* 1. HERO SECTION */}
-      {heroAnime && <HeroBanner anime={heroAnime} />}
+      {(topOfWeekHero || recommendedHero) && (
+        <HeroBanner 
+          topOfWeekAnime={topOfWeekHero} 
+          recommendedAnime={recommendedHero} 
+        />
+      )}
 
       <div className="container mx-auto px-4 relative z-10 -mt-10">
         

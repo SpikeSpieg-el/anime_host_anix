@@ -2,16 +2,33 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    unoptimized: true, // Это решает проблему с 127.0.0.1
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**', // Разрешаем всё
+        hostname: '**',
       },
     ],
   },
   experimental: {
     allowedDevOrigins: ['192.168.0.16', 'anix.stream']
+  },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+        ],
+      },
+    ]
   }
 };
 
