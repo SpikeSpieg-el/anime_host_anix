@@ -136,9 +136,11 @@ function generateArtPoster(title: string): string {
 // 2. FETCH HELPERS
 // ==========================================
 
-async function shikimoriFetch(input: string, init?: RequestInit & { next?: any }) {
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+async function shikimoriFetch(input: string, init?: RequestInit & { next?: any }, retries = 2) {
   const controller = new AbortController();
-  const timeoutMs = 15_000; // Таймаут 15 сек
+  const timeoutMs = 15_000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
@@ -151,15 +153,19 @@ async function shikimoriFetch(input: string, init?: RequestInit & { next?: any }
       signal: controller.signal
     });
 
-    if (res.status === 429) {
-      console.warn(`[Shikimori] Rate limit hit for: ${input}`);
-      // Не выбрасываем fatal error, чтобы не крашить всё приложение
-      // throw new Error("Rate limit exceeded"); 
+    // Если поймали лимит запросов
+    if (res.status === 429 && retries > 0) {
+      console.warn(`[Shikimori] 429 Rate Limit. Waiting 2s... (${retries} retries left)`);
+      await delay(2000); // Ждем 2 секунды перед повтором
+      return shikimoriFetch(input, init, retries - 1);
     }
 
     return res;
   } catch (error) {
-    // console.error(`Fetch error for ${input}:`, error);
+    if (retries > 0) {
+      await delay(1000);
+      return shikimoriFetch(input, init, retries - 1);
+    }
     throw error;
   } finally {
     clearTimeout(timeout);
@@ -507,7 +513,11 @@ async function getAnilistBackdrop(searchTitle: string): Promise<string | null> {
 // ==========================================
 
 async function transformAnime(item: ShikimoriAnime): Promise<Anime> {
-  const posterUrl = await resolveBestPoster(item.image?.original, item.name, item.russian);
+  // Упрощаем: не ждем Anilist для каждого элемента в списке, если есть постер Shikimori
+  const upgradedUrl = upgradeShikimoriUrl(item.image?.original);
+  const posterUrl = isHighQualityImage(upgradedUrl, true)
+    ? upgradedUrl
+    : generateArtPoster(item.russian || item.name);
 
   return {
     id: String(item.id),
@@ -572,7 +582,9 @@ export async function getAnimeList(limit = 20, order = 'popularity') {
 
 export async function getPopularNow(limit = 12): Promise<Anime[]> {
   try {
-    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=ongoing&score=7`);
+    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=ongoing&score=7`, {
+      next: { revalidate: 1800 }
+    });
     if (!res.ok) return [];
 
     const data: ShikimoriAnime[] = await res.json();
@@ -584,7 +596,9 @@ export async function getPopularNow(limit = 12): Promise<Anime[]> {
 
 export async function getPopularAlways(limit = 12): Promise<Anime[]> {
   try {
-    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=released&score=8`);
+    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=released&score=8`, {
+      next: { revalidate: 1800 }
+    });
     if (!res.ok) return [];
     const data: ShikimoriAnime[] = await res.json();
     return await Promise.all(data.map(transformAnime));
@@ -595,7 +609,9 @@ export async function getPopularAlways(limit = 12): Promise<Anime[]> {
 
 export async function getOngoingList(limit = 12): Promise<Anime[]> {
   try {
-    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&status=ongoing&order=ranked`);
+    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&status=ongoing&order=ranked`, {
+      next: { revalidate: 1800 }
+    });
     if (!res.ok) return [];
     const data: ShikimoriAnime[] = await res.json();
     return await Promise.all(data.map(transformAnime));
@@ -618,7 +634,7 @@ export async function getForumNews(limit = 4): Promise<NewsItem[]> {
 export async function getAnimeById(id: string) {
   try {
     const res = await shikimoriFetch(`${BASE_URL}/animes/${id}`, {
-      next: { revalidate: 300 },
+      next: { revalidate: 3600 },
       headers: HEADERS
     });
     if (!res.ok) return null;
@@ -703,26 +719,26 @@ export async function getAnimeByIds(ids: string[]) {
 // --- OPTIMIZED TOP OF WEEK (Фикс 429 ошибки) ---
 export async function getTopOfWeek(limit = 30): Promise<Anime[]> {
   try {
-    // 1. Загружаем список
-    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=ongoing&score=7`);
+    const res = await shikimoriFetch(`${BASE_URL}/animes?limit=${limit}&order=popularity&status=ongoing&score=7`, {
+      next: { revalidate: 3600 } // Кэшируем на час
+    });
     if (!res.ok) return [];
 
     const data: ShikimoriAnime[] = await res.json();
     const animeList = await Promise.all(data.map(transformAnime));
 
-    // 2. Загружаем фоны (Backdrops) ТОЛЬКО для первых 5 аниме
-    // Это предотвращает Rate Limit Hit (429), так как не делается 30 запросов одновременно
-    const animeWithBackdrop = await Promise.all(
-      animeList.map(async (anime, index) => {
-        if (index < 5) {
-            // Грузим фон только если это один из первых слайдов
-            const backdrop = await getAnimeBackdrop(anime.shikimoriId);
-            return backdrop ? { ...anime, backdrop } : anime;
-        }
-        // Для остальных оставляем как есть (экономим запросы)
-        return anime;
-      })
-    );
+    const animeWithBackdrop = [];
+    // Грузим фоны последовательно только для первых 5, с микро-паузой
+    for (let i = 0; i < animeList.length; i++) {
+      const anime = animeList[i];
+      if (i < 5) {
+        await delay(200); // Пауза 200мс между запросами фонов
+        const backdrop = await getAnimeBackdrop(anime.shikimoriId);
+        animeWithBackdrop.push(backdrop ? { ...anime, backdrop } : anime);
+      } else {
+        animeWithBackdrop.push(anime);
+      }
+    }
 
     return animeWithBackdrop;
   } catch (error) {

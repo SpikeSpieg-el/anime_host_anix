@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
-import { Bookmark, Download, ExternalLink, HardDrive, FileVideo } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, Bookmark, Download, ExternalLink, HardDrive, FileVideo } from "lucide-react"
 import type { Anime } from "@/lib/shikimori"
 import { KodikPlayer } from "@/components/kodik-player"
 import { EpisodeSelector } from "@/components/episode-selector"
@@ -90,6 +91,14 @@ export function WatchPageClient({
 
   return (
     <div className="flex flex-col gap-6 pt-20 md:pt-24 mb-10">
+      <Button
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-orange-500 text-zinc-400 hover:text-white font-medium rounded-xl transition-all w-fit"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Назад
+      </Button>
+
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl md:text-4xl font-black tracking-tight text-white">

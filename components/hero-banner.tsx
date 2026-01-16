@@ -30,7 +30,7 @@ export function HeroBanner({ topOfWeekAnime, recommendedAnime }: HeroBannerProps
     if (anime) {
       const timer = setTimeout(() => {
         setIsLoading(false)
-      }, 300)
+      }, 1)
       return () => clearTimeout(timer)
     }
   }, [anime])
@@ -218,7 +218,7 @@ export function HeroBanner({ topOfWeekAnime, recommendedAnime }: HeroBannerProps
                 
                 {/* --- МОДАЛЬНОЕ ОКНО --- */}
                 {/* max-h-[90dvh] и h-auto для мобил, чтобы не вылезало за границы браузера */}
-                <DialogContent className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 text-white w-[95vw] sm:max-w-4xl p-0 overflow-hidden shadow-2xl rounded-3xl flex flex-col max-h-[85dvh] sm:h-auto sm:max-h-[90vh]">
+                <DialogContent className="bg-zinc-950/95 backdrop-blur-2xl border border-white/10 text-white w-[95vw] sm:max-w-4xl p-0 overflow-hidden shadow-2xl rounded-3xl flex flex-col h-full max-h-[85dvh] sm:h-auto sm:max-h-[90vh]">
                   
                   <div className="flex flex-col md:grid md:grid-cols-12 h-full w-full">
                     
